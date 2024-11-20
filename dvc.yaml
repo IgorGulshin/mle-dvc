@@ -15,8 +15,8 @@ stages:
     params:
       - index_col
       - target_col
-      - one_hot_drop
-      - auto_class_weights
+      - model_params
+      - preprocessor_params
     outs:
       - models/fitted_model.pkl
   evaluate_model:

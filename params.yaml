@@ -1,7 +1,14 @@
 index_col: 'customer_id'
 target_col: 'target'
-one_hot_drop: 'if_binary'
-auto_class_weights: 'Balanced'
 n_splits: 5
 metrics: ['f1', 'roc_auc']
 n_jobs: -1
+
+model_params:
+  C: 1
+  penalty: 'l2'
+  solver: 'liblinear'  # Добавлено для совместимости с small datasets
+
+preprocessor_params:
+  cat:
+    handle_unknown: 'ignore'

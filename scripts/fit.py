@@ -1,9 +1,8 @@
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from category_encoders import CatBoostEncoder
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from catboost import CatBoostClassifier
+from sklearn.linear_model import LogisticRegression
 import yaml
 import os
 import joblib
@@ -14,47 +13,50 @@ def fit_model():
         params = yaml.safe_load(file)
     model_params = params.get('model_params', {})
     preprocessor_params = params.get('preprocessor_params', {})
+    target_col = params.get('target_col', 'target')
+    index_col = params.get('index_col', None)
     
-	# загрузите результат предыдущего шага: inital_data.csv
+    # загрузите результат предыдущего шага: inital_data.csv
     data = pd.read_csv('data/initial_data.csv')
-	# реализуйте основную логику шага с использованием гиперпараметров
-    cat_features = data.select_dtypes(include='object')
-    potential_binary_features = cat_features.nunique() == 2
-
-    binary_cat_features = cat_features[potential_binary_features[potential_binary_features].index]
-    other_cat_features = cat_features[potential_binary_features[~potential_binary_features].index]
-    num_features = data.select_dtypes(['float'])
-
-    # 3. Создание препроцессора
+    
+    # Удаляем индексный столбец, если он есть
+    if index_col and index_col in data.columns:
+        data = data.drop(columns=[index_col])
+    
+    # Разделяем признаки и целевую переменную
+    X = data.drop(columns=[target_col])
+    y = data[target_col]
+    
+    # Выделяем категориальные и числовые признаки
+    cat_features = X.select_dtypes(include='object').columns.tolist()
+    num_features = X.select_dtypes(include=['float', 'int']).columns.tolist()
+    
+    # Создание препроцессора
     preprocessor = ColumnTransformer(
         transformers=[
-            ('binary', OneHotEncoder(drop='if_binary', **preprocessor_params.get('binary', {})), binary_cat_features.columns.tolist()),
-            ('cat', CatBoostEncoder(**preprocessor_params.get('cat', {})), other_cat_features.columns.tolist()),
-            ('num', StandardScaler(**preprocessor_params.get('num', {})), num_features.columns.tolist())
+            ('cat', OneHotEncoder(**preprocessor_params.get('cat', {})), cat_features),
+            ('num', StandardScaler(**preprocessor_params.get('num', {})), num_features)
         ],
         remainder='drop',
         verbose_feature_names_out=False
     )
-    # 4. Инициализация модели
-    model = CatBoostClassifier(**model_params)
-
-    # 5. Создание пайплайна
+    
+    # Инициализация модели
+    model = LogisticRegression(**model_params)
+    
+    # Создание пайплайна
     pipeline = Pipeline([
         ('preprocessor', preprocessor),
         ('model', model)
     ])
-
-    # 6. Обучение модели
-    X = data.drop(columns=['target'])
-    y = data['target']
+    
+    # Обучение модели
     pipeline.fit(X, y)    
     
-	# сохраните обученную модель в models/fitted_model.pkl
-    
+    # Сохранение обученной модели
     os.makedirs('models', exist_ok=True)
     joblib.dump(pipeline, 'models/fitted_model.pkl')
     print("Model saved to 'models/fitted_model.pkl'")    
 
-
 if __name__ == '__main__':
-	fit_model()
+    fit_model()
